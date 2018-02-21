@@ -6,3 +6,5 @@ To execute the session run PowerShell and paste in the following command and pre
 ```
 iex (iwr http://bit.ly/2onXd61).content
 ```
+  
+Once the session is ended enter ```exit``` twice at the PowerShell prompt to exit.  
