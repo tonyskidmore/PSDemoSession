@@ -3,7 +3,7 @@
 Param
 (
     [bool]
-    $WebOnly = $True
+    $WebOnly = $False
 )
 
 #region functions
