@@ -2,8 +2,8 @@
 [OutputType('System.Management.Automation.PSObject')]
 Param
 (
-    [switch]
-    $SkipUserSetup
+    [bool]
+    $WebOnly = $True
 )
 
 #region functions
@@ -524,7 +524,7 @@ function Get-OpenPorts {
                 @{ Destination="ansible.cloud-msp.net"; Port=22 }, 
                 @{ Destination="ansible.cloud-msp.net"; Port=80 },
                 @{ Destination="ansible.cloud-msp.net"; Port=443 },
-                @{ Destination="jumphost.cloud-msp.net"; Port=23 }, 
+                @{ Destination="jumphost.cloud-msp.net"; Port=22 }, 
                 @{ Destination="jumphost.cloud-msp.net"; Port=80 },
                 @{ Destination="jumphost.cloud-msp.net"; Port=443 }
 
@@ -623,7 +623,7 @@ if(-not (Get-JobStatus)) {
 Write-Host "Your username is: $UserName" -ForegroundColor Green
 Write-Host "Your password is: $Password" -ForegroundColor Green
 
-if( Get-PortStatus "jumphost.cloud-msp.net" 22) {
+if( (Get-PortStatus "jumphost.cloud-msp.net" 22) -and (-not $WebOnly)) {
     Get-Putty
     Get-PSScript
     $keyResult = Get-Key
