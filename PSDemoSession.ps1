@@ -28,6 +28,34 @@ Function ConvertFrom-Base64
 
 }
 
+function ConvertTo-Base64()
+{
+
+    $auth = $Username + ':' + $Password
+
+    $encoded = [System.Text.Encoding]::UTF8.GetBytes($auth)
+    $encodedPassword = [System.Convert]::ToBase64String($Encoded)
+
+    $script:demoUser = $encodedPassword
+
+}
+
+function New-SimplePassword
+{
+    Param(
+        [string]
+        $Prefix = "Demo",
+
+        [int]
+        $SuffixCount = 2
+    )
+
+    $pwd = (([char[]]([char]97..[char]120)) + 0..9 | sort {Get-Random})[1..$SuffixCount] -join ''
+    $pwd = "$Prefix"+$pwd
+    $script:Password = $pwd
+
+}
+
 function Get-UserName
 {
 
@@ -43,7 +71,7 @@ function Get-UserName
     else {
         $script:UserName = $User    
     }
-    $Username
+
 }
 
 Function Get-DnsTxt
@@ -55,15 +83,6 @@ Function Get-DnsTxt
 
         # attempting old school method
         $txtEntry = Get-DnsTxtNslookup
-        if($txtEntry -lt 10) {
-            # Write-Host "Sorry you are running an old version of Windows and we could not use an alternate method to lookup TXT record, cannot continue" -ForegroundColor Red
-            # exit 1
-            $txtEntry = "ZGVtb3Jlc3R1c2VyOlczbGxEb25lWW91Rm91bmQxdDotKQ=="
-            return $txtEntry
-        }
-        else {
-            return $txtEntry  
-        }
     }
 
     try {
@@ -72,11 +91,6 @@ Function Get-DnsTxt
     }
     catch {
         Write-Error "Failed to get DNS TXT record"
-    }
-
-    if(-not($txtEntry.Strings)) {
-        $txtEntry = "ZGVtb3Jlc3R1c2VyOlczbGxEb25lWW91Rm91bmQxdDotKQ=="
-        return $txtEntry            
     }
 }
 
@@ -166,7 +180,7 @@ function Start-AwxTemplate
 
 
     $hashData = @{
-        demo_user = $UserName
+        demo_user = $demoUser
     }
 
     $extraVars = @{
@@ -212,7 +226,7 @@ function Start-AwxTemplate
         $status = $job.status
 
         Write-Output "Checking job $i of $loops.  Status = $status"
-        if(($status -ne "running") -and ($status -ne "waiting")) {
+        if(($status -ne "running") -and ($status -ne "waiting") -and ($status -ne "pending")) {
             break
         }
 
@@ -248,10 +262,10 @@ function Get-PSScript
 {
     Param(
 
-        $Url = 'https://raw.githubusercontent.com/tonyskidmore/PSPuttySession/master/PSPuttySession.ps1'
+        $Url = 'https://raw.githubusercontent.com/tonyskidmore/PSDemoSession/master/PSDemoSession.ps1'
     )
 
-    $outputFile = "$tmpDir\PSPuttySession.ps1"
+    $outputFile = "$tmpDir\PSDemoSession.ps1"
 
 
     try {
@@ -376,7 +390,7 @@ function Invoke-PuttySession
 
 function New-ProjectSpace
 {
-    $workingDir = 'PSPuttySession'
+    $workingDir = 'PSDemoSession'
     $temp = $env:TEMP
     $script:tmpDir = Join-Path -Path $temp -ChildPath $workingDir
 
@@ -396,14 +410,17 @@ function New-ProjectSpace
 # main script execution
 Get-DnsTxt | ConvertFrom-Base64 | ConvertTo-PSCredential
 Get-UserName
-Wait-Random
+New-SimplePassword
+ConvertTo-Base64
+#Wait-Random
 Start-AwxTemplate
-New-ProjectSpace
-Get-Putty
-Get-PSScript
-$setKey = Set-HostKey
-if(Get-Key -and $setKey) { 
-    Write-Output "Your username is: $UserName"    
-    Invoke-PuttySession 
-}
+#New-ProjectSpace
+#Get-Putty
+#Get-PSScript
+#$setKey = Set-HostKey
+#if(Get-Key -and $setKey) { 
+    Write-Output "Your username is: $UserName" 
+    Write-Output "Your password is: $Password"
+    #Invoke-PuttySession 
+#}
 
