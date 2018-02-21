@@ -153,6 +153,18 @@ function Start-AwxTemplate
 
     if($SkipUserSetup) { return }
 
+
+    $params = @{
+        'Uri' = 'http://ansible.cloud-msp.net/api/v2/job_templates/'
+        'Credential' = $cred
+        'ErrorAction' = 'Stop'
+    }
+
+    $templates = Invoke-RestMethod @params
+
+    $jobTemplateID = ($templates.results | Where-Object Name -eq "ansibledemo").id
+
+
     $hashData = @{
         demo_user = $UserName
     }
@@ -161,8 +173,10 @@ function Start-AwxTemplate
         extra_vars = $hashData
     }
 
+    $uri = "http://ansible.cloud-msp.net/api/v2/job_templates/$($jobTemplateID)/launch/"
+
     $params = @{
-        'Uri' = 'http://ansible.cloud-msp.net/api/v2/job_templates/6/launch/'
+        'Uri' = $uri
         'Credential' = $cred
         'Method' = 'Post'
         'ContentType' = 'application/json'
@@ -171,13 +185,41 @@ function Start-AwxTemplate
     }
     
     try {
-        $result = Invoke-RestMethod @params
-        Write-Output "AWX job id: $($result.id), status = $($result.result_stdout)"
+        $invokeTemplate = Invoke-RestMethod @params
+        $jobId = $invokeTemplate.id
+        Write-Output "AWX job id: $($jobId)"
     }
     catch {
+        Write-Output $_
         Write-Error -Message "Failed to invoke AWX job"
-        exit 1
+        # exit 1
     }
+
+    $loops = 40
+    $wait = 3
+
+    for($i = 1 ; $i -le $loops ; $i++) {
+
+        
+        $uri = "http://ansible.cloud-msp.net/api/v2/jobs/$jobId/"
+
+        $params = @{
+            'Uri' = $uri
+            'Credential' = $cred
+            'ErrorAction' = 'Stop'
+        }
+        $job = Invoke-RestMethod @params
+        $status = $job.status
+
+        Write-Output "Checking job $i of $loops.  Status = $status"
+        if(($status -ne "running") -and ($status -ne "waiting")) {
+            break
+        }
+
+        Start-Sleep -Seconds $wait
+
+    }
+
 
 }
 
