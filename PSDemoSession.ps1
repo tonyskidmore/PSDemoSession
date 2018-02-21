@@ -40,6 +40,122 @@ function ConvertTo-Base64()
 
 }
 
+function Test-TcpPort
+{
+    Param (
+
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]
+        $ComputerName,
+
+        [Parameter(Mandatory=$true, Position=1)]
+        [int]
+        $Port,
+
+        [int]
+        $TimeOut = 1000
+
+    )
+
+    # https://msdn.microsoft.com/en-us/library/system.net.sockets.tcpclient(v=vs.110).aspx
+    $tcpObject = New-Object System.Net.Sockets.TcpClient 
+
+    $connect = $tcpObject.BeginConnect($ComputerName,$Port,$null,$null) 
+
+    $wait = $connect.AsyncWaitHandle.WaitOne($TimeOut,$false) 
+    if (-not $Wait) {
+        $response = $false
+    } 
+    else {
+        $error.clear()
+        try {
+            $tcpobject.EndConnect($connect) | Out-Null
+            if ($error[0]) {
+                $response = $false
+            } else {
+                $response = $true
+            }
+        }
+        catch {
+            $response = $false
+        }
+    }
+
+    $response
+}
+
+# http://www.jkdba.com/powershell-open-url-in-default-browser/
+function Invoke-URLInDefaultBrowser
+{
+    <#
+        .SYNOPSIS
+            Cmdlet to open a URL in the User's default browser.
+        .DESCRIPTION
+            Cmdlet to open a URL in the User's default browser.
+        .PARAMETER URL
+            Specify the URL to be Opened.
+        .EXAMPLE
+            PS> Invoke-URLInDefaultBrowser -URL 'http://jkdba.com'
+            
+            This will open the website "jkdba.com" in the user's default browser.
+        .NOTES
+            This cmdlet has only been test on Windows 10, using edge, chrome, and firefox as default browsers.
+    #>
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(
+            Position = 0,
+            Mandatory = $true
+        )]
+        [ValidateNotNullOrEmpty()]
+        [String] $URL
+    )
+    #Verify Format. Do not want to assume http or https so throw warning.
+    if( $URL -notmatch "http://*" -and $URL -notmatch "https://*")
+    {
+        Write-Warning -Message "The URL Specified is formatted incorrectly: ($URL)" 
+        Write-Warning -Message "Please make sure to include the URL Protocol (http:// or https://)"
+        break;
+    }
+    #Replace spaces with encoded space
+    $URL = $URL -replace ' ','%20'
+    
+    #Get Default browser
+    $DefaultSettingPath = 'HKCU:\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice'
+    $DefaultBrowserName = (Get-Item $DefaultSettingPath | Get-ItemProperty).ProgId
+    
+    #Handle for Edge
+    ##edge will no open with the specified shell open command in the HKCR.
+    if($DefaultBrowserName -eq 'AppXq0fevzme2pys62n3e0fbqa7peapykr8v')
+    {
+        #Open url in edge
+        start Microsoft-edge:$URL 
+    }
+    else
+    {
+        try
+        {
+            #Create PSDrive to HKEY_CLASSES_ROOT
+            $null = New-PSDrive -PSProvider registry -Root 'HKEY_CLASSES_ROOT' -Name 'HKCR'
+            #Get the default browser executable command/path
+            $DefaultBrowserOpenCommand = (Get-Item "HKCR:\$DefaultBrowserName\shell\open\command" | Get-ItemProperty).'(default)'
+            $DefaultBrowserPath = [regex]::Match($DefaultBrowserOpenCommand,'\".+?\"')
+            #Open URL in browser
+            Start-Process -FilePath $DefaultBrowserPath -ArgumentList $URL   
+        }
+        catch
+        {
+            Throw $_.Exception
+        }
+        finally
+        {
+            #Clean up PSDrive for 'HKEY_CLASSES_ROOT
+            Remove-PSDrive -Name 'HKCR'
+        }
+    }
+}
+
 function New-SimplePassword
 {
     Param(
@@ -225,7 +341,7 @@ function Start-AwxTemplate
         $job = Invoke-RestMethod @params
         $status = $job.status
 
-        Write-Output "Checking job $i of $loops.  Status = $status"
+        Write-Output "Checking job id $($jobId): $i of $loops attempts Status = $status"
         if(($status -ne "running") -and ($status -ne "waiting") -and ($status -ne "pending")) {
             break
         }
@@ -234,6 +350,7 @@ function Start-AwxTemplate
 
     }
 
+    $status | Out-File -FilePath "$tmpDir\awxstatus.txt"
 
 }
 
@@ -241,19 +358,24 @@ function Get-Putty
 {
     Param(
 
-        $Url = 'https://the.earth.li/~sgtatham/putty/latest/w32/putty.exe'
+        $PuttyUrl = 'https://the.earth.li/~sgtatham/putty/latest/w32/putty.exe',
+        $PlinkUrl = 'https://the.earth.li/~sgtatham/putty/latest/w32/plink.exe'
+
     )
 
-    $outputFile = "$tmpDir\putty.exe"
-
+    $puttyFile = "$tmpDir\putty.exe"
+    $plinkFile = "$tmpDir\plink.exe"
 
     try {
-        if(-not (Test-Path -Path $outputFile)) {
-            Invoke-WebRequest -Uri $Url -OutFile $outputFile -ErrorAction Stop
+        if(-not (Test-Path -Path $puttyFile)) {
+            Invoke-WebRequest -Uri $PuttyUrl -OutFile $puttyFile -ErrorAction Stop
+        }
+        if(-not (Test-Path -Path $plinkFile)) {
+            Invoke-WebRequest -Uri $PlinkUrl -OutFile $plinkFile -ErrorAction Stop
         }
     }
     catch {
-        Write-Error -Message "Failed to download putty"
+        Write-Error -Message "Failed to download putty tools"
     }
 
 }
@@ -279,35 +401,6 @@ function Get-PSScript
 
 }
 
-function Set-HostKey
-{
-
-    $HostKey = '0x10001,0xe127dd89afacb7f4dc6a1e3193b07f66e6f1ee4fa840cf2c7921d3f7b50283f72cf0e464232483b0869440c27458fdbbb4e87449de53d3cf2fd000ef2a7d329c325972885d5dd5aef0f7cf15fe897d6d98af1a31d76933c061e15962df081804a20165fe4b8ea9360d0a3466e4dcd3d75dc4e5519209e00b817a436ccdeac150321d04a9cef64a10d8117217d6f2f956a9d49b19e508511a7af87ba35bfe4d8ebcb06074ef57050dc8337dcca805923a72a74fbc21a90301db8d7b3bf939c99d63c2d7e2bf69e192f3619a328a76a36e78132b3ba219ca4ca7f532159a11344cb60b5bccca08c3380ed39c3dabf7a4044f700eddad5683dd93cfa57f744d16d3'
-
-    $regName = 'rsa2@22:jumphost.cloud-msp.net'
-
-    try {
-        if(-not (Test-Path -Path HKCU:\software\SimonTatham\PuTTY\SshHostKeys -ErrorAction Stop)) {
-            $puttyRoot = New-Item -Path HKCU:\software\SimonTatham\
-            $puttyReg = New-Item -Path HKCU:\software\SimonTatham\PuTTY
-            $puttySshHostKey = New-Item -Path HKCU:\software\SimonTatham\PuTTY -Name SshHostKeys -ErrorAction Stop
-        }
-    }
-    catch {
-        Write-Error -Message "Failed create putty registry key"
-        return $false    
-    }
-
-    try {
-        $newProperty = New-ItemProperty -Path "HKCU:\software\SimonTatham\PuTTY\SshHostKeys" -Name $regName -Value $HostKey -PropertyType String -Force -ErrorAction Stop | Out-Null
-    }
-    catch {
-        Write-Error -Message "Failed to set hostkey"
-        return $false
-    }
-    
-    return $true
-}
 
 function Get-Key
 {
@@ -351,10 +444,9 @@ function Get-Key
     if(-not $keyFound) { 
         Write-Progress -Activity "Failed to acquire the key" -Completed
         Write-Error "Unable to obtain the key"
-        return $false
-    } else {
-        Write-Output "Key obtained"
-        return $true
+    }
+    else {
+        $true
     }
 
 
@@ -371,17 +463,37 @@ function Invoke-PuttySession
         $User = $UserName,
 
         [string]
-        $PrivateKey = (Join-Path -Path $tmpDir -ChildPath "$UserName.ppk"),
+        $PrivateKey
 
-        [string]
-        $HostKey = '2b:8a:67:2e:0e:a3:a3:39:d7:da:0b:2f:6a:c6:fb:ab'
     )
 
     try {
-        $puttyPath = Join-Path -Path $tmpDir -ChildPath 'putty.exe'
-        $argumentList = "$User@$Hostname -i $PrivateKey -hostkey $HostKey"
+        
+        if(-not $PrivateKey) {
+            $PrivateKey = (Join-Path -Path $tmpDir -ChildPath "$UserName.ppk")
+        }
 
-        $result = Start-Process -FilePath $puttyPath -ArgumentList $argumentList -NoNewWindow -ErrorAction Stop
+        $plinkPath = Join-Path -Path $tmpDir -ChildPath 'plink.exe'
+        $puttyPath = Join-Path -Path $tmpDir -ChildPath 'putty.exe'
+
+        $testPaths = @($PrivateKey, $plinkPath, $puttyPath)
+
+        foreach($testPath in $testPaths) {
+
+            if(-not (Test-Path -Path $testPath)) {
+                Write-Error "Unable to locate $testPath)"
+                $failPath = $true
+            }
+        }
+
+        if($failPath) {
+            exit 1
+        }
+        else {
+            Write-Output y | & $plinkPath $User@$Hostname -i $PrivateKey "exit" 2>&1 | Out-Null
+            & $puttyPath $User@$Hostname -i $PrivateKey 2>&1 | Out-Null
+        }
+
     }
     catch {
         Write-Error -Message "Failed to run putty session"
@@ -404,23 +516,127 @@ function New-ProjectSpace
     }
 }
 
+function Get-OpenPorts {
+
+    $portArray = @()
+
+    $body = @( 
+                @{ Destination="ansible.cloud-msp.net"; Port=22 }, 
+                @{ Destination="ansible.cloud-msp.net"; Port=80 },
+                @{ Destination="ansible.cloud-msp.net"; Port=443 },
+                @{ Destination="jumphost.cloud-msp.net"; Port=23 }, 
+                @{ Destination="jumphost.cloud-msp.net"; Port=80 },
+                @{ Destination="jumphost.cloud-msp.net"; Port=443 }
+
+            )
+
+    $portArray += $body | ForEach-Object { $_.Add('Status', (Test-TcpPort $_.Destination $_.Port)) ;
+                                           New-Object -TypeName PSObject -Property $_ }
+    $script:PortStatus = $portArray
+}
+
+function Get-PortStatus
+{
+    Param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]
+        $Destination,
+
+        [Parameter(Mandatory=$true, Position=1)]
+        [int]
+        $Port
+    )
+
+    if(($PortStatus | Where-Object { ($_.Destination -eq $Destination) -and
+                                     ($_.Port -eq $Port) }).Status) {
+        $true
+    }
+    else {
+        $false
+    }
+}
+
+function Get-JobStatus
+{
+
+    if(Test-Path -Path "$tmpDir\awxstatus.txt") {
+        $jobStatus = Get-Content -LiteralPath "$tmpDir\awxstatus.txt"
+        if($jobStatus -eq 'successful') {
+            $true
+        }
+        else {
+            $false
+        }
+    }
+
+}
+
+function Import-XmlCredential
+{
+
+    if(Test-Path -Path "$tmpDir\cred.xml") {
+        $credential = Import-Clixml -Path "$tmpDir\cred.xml"
+        $script:Username = $credential.Username
+        $script:Password = $credential.GetNetworkCredential().Password
+        $true
+    }
+    else {
+        $false
+    }
+}
+
+function Export-XmlCredential
+{
+
+    if(-not (Test-Path -Path "$tmpDir\cred.xml") -and $Username -and $Password) {
+        $pwd = $Password | ConvertTo-SecureString -asPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($Username,$pwd)
+        $credential | Export-Clixml -Path "$tmpDir\cred.xml"
+    }
+    else {
+        $false
+    }
+}
+
 
 #endregion functions
 
 # main script execution
-Get-DnsTxt | ConvertFrom-Base64 | ConvertTo-PSCredential
-Get-UserName
-New-SimplePassword
-ConvertTo-Base64
-#Wait-Random
-Start-AwxTemplate
-#New-ProjectSpace
-#Get-Putty
-#Get-PSScript
-#$setKey = Set-HostKey
-#if(Get-Key -and $setKey) { 
-    Write-Output "Your username is: $UserName" 
-    Write-Output "Your password is: $Password"
-    #Invoke-PuttySession 
-#}
+New-ProjectSpace
+Get-OpenPorts
 
+if(-not (Import-XmlCredential)) {
+    Get-UserName
+    New-SimplePassword
+    ConvertTo-Base64
+    Export-XmlCredential
+}
+
+
+if(-not (Get-JobStatus)) {
+    Get-DnsTxt | ConvertFrom-Base64 | ConvertTo-PSCredential
+
+    #Wait-Random
+    Start-AwxTemplate
+}
+
+Write-Host "Your username is: $UserName" -ForegroundColor Green
+Write-Host "Your password is: $Password" -ForegroundColor Green
+
+if( Get-PortStatus "jumphost.cloud-msp.net" 22) {
+    Get-Putty
+    Get-PSScript
+    $keyResult = Get-Key
+
+    if($keyResult) { 
+        Write-Host "Please now switch to the putty session" -ForegroundColor Green
+        Invoke-PuttySession
+    }
+}
+elseif( Get-PortStatus "jumphost.cloud-msp.net" 443) {
+    Write-Host "Please now switch to the browser session" -ForegroundColor Green
+    Invoke-URLInDefaultBrowser "https://jumphost.cloud-msp.net"
+}
+else {
+    Write-Output "Unable to establish a connection to jumphost.cloud-msp.net"     
+}
