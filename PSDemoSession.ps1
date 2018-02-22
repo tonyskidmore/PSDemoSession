@@ -643,7 +643,7 @@ if( (Get-PortStatus "jumphost.cloud-msp.net" 22) -and (-not $WebOnly)) {
     $keyResult = Get-Key
 
     if($keyResult) { 
-        Write-Host "Please now switch to the putty session" -ForegroundColor Green
+        Write-Host "Please now switch to the putty session" -ForegroundColor Yellow
         Invoke-PuttySession
         Remove-SshHostKey
     }
