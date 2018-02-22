@@ -649,7 +649,7 @@ if( (Get-PortStatus "jumphost.cloud-msp.net" 22) -and (-not $WebOnly)) {
     }
 }
 elseif( Get-PortStatus "jumphost.cloud-msp.net" 443) {
-    Write-Host "Please now switch to the browser session" -ForegroundColor Green
+    Write-Host "Please now switch to the browser session" -ForegroundColor Yellow
     Invoke-URLInDefaultBrowser "https://jumphost.cloud-msp.net"
 }
 else {
