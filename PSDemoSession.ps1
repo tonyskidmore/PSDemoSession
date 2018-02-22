@@ -40,6 +40,20 @@ function ConvertTo-Base64()
 
 }
 
+function Remove-SshHostKey
+{
+
+    $regPath = 'HKCU:\Software\SimonTatham\PuTTY\SshHostKeys'
+    $regKey = (Get-ItemProperty $regPath)
+
+    $RegKey.PSObject.Properties | ForEach-Object {
+      if($_.Name -like '*jumphost.cloud-msp.net*'){
+        Remove-ItemProperty -Path $regPath -Name $_.Name
+      }
+    }
+
+}
+
 function Test-TcpPort
 {
     Param (
@@ -631,6 +645,7 @@ if( (Get-PortStatus "jumphost.cloud-msp.net" 22) -and (-not $WebOnly)) {
     if($keyResult) { 
         Write-Host "Please now switch to the putty session" -ForegroundColor Green
         Invoke-PuttySession
+        Remove-SshHostKey
     }
 }
 elseif( Get-PortStatus "jumphost.cloud-msp.net" 443) {
