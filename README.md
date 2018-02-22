@@ -1,4 +1,4 @@
-## PSDemoSession
+# PSDemoSession
 
 PSDemoSession is a PowerShell script that handles the connection to a cloud demo system
 
@@ -17,7 +17,7 @@ Note: If prompted add https://jumphost.cloud-msp.net to Trusted Sites to enable 
 - Type *exit* at the PowerShell prompt
 - Press the up arrow key to bring up the above command again and press enter  
 
-# Cleanup
+## Cleanup
 To clear out files used during the session creation process run the followiing command in PowerShell  
 ```
 Remove-Item $env:TEMP\PSDemoSession -Recurse
