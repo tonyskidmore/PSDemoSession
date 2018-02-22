@@ -4,7 +4,7 @@ PSDemoSession is a PowerShell script that handles the connection to a cloud demo
 
 To execute the session run PowerShell and paste in the following command and press enter.  
   
-If you are not sure how to run PowerShell press wth "Windows Key + R" on your keyboard to bring up the Run dialog box, type in *powershell* and click the OK button.  
+Note: If you are not sure how to run PowerShell press wth "Windows Key + R" on your keyboard to bring up the Run dialog box, type in *powershell* and click the OK button.  
 ```
 iex (iwr http://bit.ly/2onXd61).content
 ```
