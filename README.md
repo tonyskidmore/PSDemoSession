@@ -1,5 +1,6 @@
-# PSDemoSession
+# PSDemoSession  
 
+## Demo Session Connection  
 PSDemoSession is a PowerShell script that handles the connection to a cloud demo system
 
 To execute the session run PowerShell and paste in the following command and press enter.  
