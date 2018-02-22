@@ -12,7 +12,12 @@ The above command will attempt to use a putty session to connect to the demo ses
 ```
 iex (iwr http://bit.ly/2EKfVM6 -usebasic).content
 ```
+Note: If prompted add https://jumphost.cloud-msp.net to Trusted Sites to enable functionality.  If there is a message saying that JavaScript must be enabled then try the following:  
+- Close the browser
+- Type *exit* at the PowerShell prompt
+- Press the up arrow key to bring up the above command again and press enter  
 
+# Cleanup
 To clear out files used during the session creation process run the followiing command in PowerShell  
 ```
 Remove-Item $env:TEMP\PSDemoSession -Recurse
