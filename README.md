@@ -25,3 +25,5 @@ Remove-Item $env:TEMP\PSDemoSession -Recurse
 ```
   
 Once the session is ended enter ```exit``` twice at the PowerShell prompt to exit.  
+
+This script is used to establish a connection to a demo environment deployed using [ansible_azure_ansible_demo](https://github.com/tonyskidmore/cloud-msp/tree/master/examples/ansible_azure_ansible_demo)
